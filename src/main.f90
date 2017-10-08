@@ -1,4 +1,4 @@
 program euler
-   implict none
+   implicit none
    write(6,*) 'hello world'
 end program euler
