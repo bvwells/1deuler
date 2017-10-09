@@ -13,7 +13,7 @@ The one-dimensional Euler Equations are solved using a moving mesh
 method which uses the monitor function ```M=u(x,t)``` in the moving mesh 
 equations for the mesh velocity. The mesh is advanced forwards in time 
 using a forward Euler time-stepping scheme. The solution to the Euler equations
-are obtained by solving rhe Arbitrary Lagrangian Eulerian (ALE) formation
+are obtained by solving the Arbitrary Lagrangian Eulerian (ALE) formation
 of the equations with a finite volume method. All the moving mesh equations are solved using
 linear finite elements.
 
