@@ -1,7 +1,7 @@
 program euler
    implicit none
 
-   double precision, allocatable :: x(:), xdot(:), Sol(:, :), Flux(:, :)
+   double precision, allocatable :: x(:), Sol(:, :), Flux(:, :)
    double precision :: Time, OutputTime, DeltaT, DeltaX, CFL, ReportTime
    real :: StartTime, EndTime
    integer :: CurrentReportStep, NoOfReportSteps
@@ -11,11 +11,9 @@ program euler
    ! Start timing procedure
    call cpu_time(StartTime)
 
+   call ReadVariables(NumberOfNodes, NoOfReportSteps, CFL, InitialConditionChoice)
 
-   call ReadVariables(NumberOfNodes, NoOfReportSteps, CFL, InitialConditionChoice, &
-                      BoundaryConditionLeft, BoundaryConditionRight)
-
-   allocate (x(NumberOfNodes), xdot(NumberOfNodes))
+   allocate (x(NumberOfNodes))
    allocate (Sol(0:NumberOfNodes, 3), Flux(NumberOfNodes, 3))
 
    Time = 0.0d0
@@ -67,7 +65,7 @@ program euler
       endif
    enddo
 
-   close (20)
+   call WriteVariables(OutputTime, NoOfReportSteps)
 
    ! End timing procedure
    call cpu_time(EndTime)
@@ -96,6 +94,24 @@ subroutine ReadVariables(NumberOfNodes, NoOfReportSteps, CFL, InitialConditionCh
    close (10)
 
 end subroutine ReadVariables
+
+subroutine WriteVariables(OutputTime, NoOfReportSteps)
+
+   implicit none
+!------------------------------------------------------------------------------
+   double precision, intent(IN) :: OutputTime
+   integer, intent(IN) :: NoOfReportSteps
+!------------------------------------------------------------------------------
+
+   ! Write the solution variables to file
+   open (unit=10, file='variables.m')
+   write (10, *) OutputTime
+   write (10, *) NoOfReportSteps
+   close (10)
+
+   return
+
+end subroutine WriteVariables
 
 subroutine InitialMesh(x, NumberOfNodes, DeltaX)
    implicit none
