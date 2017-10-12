@@ -364,6 +364,7 @@ subroutine WriteSolution(x, Sol, NumberOfNodes)
    integer, parameter :: NoOfSF = 3
    integer :: TestNumber, i, j, units(NoOfSF)
    integer, save :: ReportStep = 1
+   double precision, external :: Eos
 !-------------------------------------------------------------------------------
    ! Construct the solution output filename
    TestNumber = ReportStep
@@ -377,7 +378,7 @@ subroutine WriteSolution(x, Sol, NumberOfNodes)
    Filename = trim(Filename)//'.m'
    open (unit=10, file=Filename)
    do i = 1, NumberOfNodes - 1
-      write (10, '(99f20.8)') 0.5d0*(x(i + 1) + x(i)), (Sol(i, j), j=1, 3)
+      write (10, '(99f20.8)') 0.5d0*(x(i + 1) + x(i)), Sol(i, 1), Sol(i, 2)/Sol(i, 1), Eos(Sol(i,:)), Sol(i,3)/Sol(i,1) 
    enddo
    close (unit=10)
 
