@@ -11,17 +11,15 @@ program euler
    ! Start timing procedure
    call cpu_time(StartTime)
 
-   NumberOfNodes = 100
+
+   call ReadVariables(NumberOfNodes, NoOfReportSteps, CFL, InitialConditionChoice, &
+                      BoundaryConditionLeft, BoundaryConditionRight)
 
    allocate (x(NumberOfNodes), xdot(NumberOfNodes))
    allocate (Sol(0:NumberOfNodes, 3), Flux(NumberOfNodes, 3))
 
    Time = 0.0d0
-   CFL = 0.1d0
-
    CurrentReportStep = 1
-   NoOfReportSteps = 10
-   InitialConditionChoice = 1
 
    ! Create mesh
    call InitialMesh(x, NumberOfNodes, DeltaX)
@@ -81,6 +79,23 @@ program euler
    write (6, *)
 
 end program euler
+
+subroutine ReadVariables(NumberOfNodes, NoOfReportSteps, CFL, InitialConditionChoice)
+   implicit none
+!-------------------------------------------------------------------------------
+   double precision, intent(OUT) :: CFL
+   integer, intent(OUT) :: NumberOfNodes, NoOfReportSteps, InitialConditionChoice
+!-------------------------------------------------------------------------------
+
+   ! Read variables into program.
+   open (unit=10, file='variables.data', status='old', form='formatted')
+   read (10, *) NumberOfNodes
+   read (10, *) NoOfReportSteps
+   read (10, *) CFL
+   read (10, *) InitialConditionChoice
+   close (10)
+
+end subroutine ReadVariables
 
 subroutine InitialMesh(x, NumberOfNodes, DeltaX)
    implicit none
