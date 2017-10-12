@@ -53,4 +53,19 @@ Build the executable by running the command:
 make
 ```
 
+## Running
+
+The program takes the file [variables.data](./variables.data) as input to the simulation. The program can be run from the base of the repo with the command:
+
+```
+./bin/1deuler.exe
+```
+
+The program outputs the mesh and solution over time into the files ```SolutionXXX.m```. The variables for the solution are written to the file ```variables.m```.
+
+## Plotting Solution
+
+The output from the simulation can be plotted in [Octave](https://www.gnu.org/software/octave/) by running the plotting file
+[plot_solution.m](./plot_solution.m) in the root of the repo.
+
 [1]: http://www.reading.ac.uk/nmsruntime/saveasdialog.aspx?lID=24080&sID=90294
