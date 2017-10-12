@@ -1,0 +1,4 @@
+        100             Number of nodes in discretisation.
+        10              Number of report times for the simulation.
+        0.1             CFL Condition
+        1               Initial Condition choice [1] Sod, [2] Blast wave, [3] Lax, [4] Modified Sod, [5] 123.
