@@ -23,12 +23,19 @@ for report = 1:numberReports
    subplot(2,2,2) 
    plot(u(:,1),u(:,3));
    xlabel('x');
-   ylabel('\rho u');   
-   title(strcat('Momentum (\rho u) at time=',num2str(time)));
+   ylabel('u');   
+   title(strcat('Velocity (u) at time=',num2str(time)));
 
    subplot(2,2,3) 
    plot(u(:,1),u(:,4));
    xlabel('x');
    ylabel('E');
-   title(strcat('Energy (E) at time=',num2str(time)));
-  end
+   title(strcat('Pressure (P) at time=',num2str(time)));
+
+   subplot(2,2,4) 
+   plot(u(:,1),u(:,5));
+   xlabel('x');
+   ylabel('E');
+   title(strcat('Internal Energy (e) at time=',num2str(time)));
+ 
+ end
