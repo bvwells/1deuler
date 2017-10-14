@@ -7,6 +7,21 @@ One dimensional Compressible Euler Equations solved with moving mesh approach de
 
 which can be found [here][1].
 
+The Compressible Euler equations are described by the non-linear system of partial differential equations
+
+```
+ρ_t + (ρu)_x = 0
+(ρu)_t + (ρu^2 + P)_x = 0
+E_t + (u(E+P))_x = 0
+```
+
+where ```ρ```, ```u```, ```P``` and ```E``` are the density, velocity, pressure and energy of the gas being modelled. The equation state for an ideal gas is used which is given by
+
+```
+E=P/(1-γ) + 0.5ρv^2
+```
+where ```γ``` is the ratio of specific heats for the gas.
+
 ## Numerical Solution
 
 The one-dimensional Euler Equations are solved using a moving mesh 
