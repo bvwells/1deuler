@@ -8,7 +8,7 @@ numberReports = variables(2);
 for report = 1:numberReports 
 
    figure(report)
-   time = (report-1)* (output_t/(numberReports-1))
+   time = (report-1)* (output_t/(numberReports-1));
    
    filename = strcat('Solution', sprintf('%03d',[report]), '.m');
 
@@ -39,3 +39,14 @@ for report = 1:numberReports
    title(strcat('Internal Energy (e) at time=',num2str(time)));
  
  end
+
+figure(numberReports+1)
+load 'x_traj.m';
+for j=1:100;
+   plot(x_traj(:,j),x_traj(:,101));
+   hold on;
+end
+hold off;
+axis tight;
+xlabel('x');
+ylabel('time');

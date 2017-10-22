@@ -7,6 +7,7 @@ SET(1DEULEREXE 1deuler.exe)
 
 # Add the source files
 SET(1DEULER_Sources ${SRC}/main.f90
+                    ${SRC}/linear_solvers.f90
 )
 
 # Define the executable in terms of the source files

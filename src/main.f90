@@ -1,26 +1,27 @@
-program euler
+program Euler
    implicit none
 
-   double precision, allocatable :: x(:), Sol(:, :), Flux(:, :)
+   double precision, allocatable :: x(:,:), xdot(:), Sol(:, :), Flux(:, :)
    double precision :: Time, OutputTime, DeltaT, DeltaX, CFL, ReportTime
    real :: StartTime, EndTime
    integer :: CurrentReportStep, NoOfReportSteps
    integer :: NumberOfNodes, InitialConditionChoice
    integer :: BoundaryConditionLeft, BoundaryConditionRight
+   integer :: MovingMeshChoice
 
    ! Start timing procedure
    call cpu_time(StartTime)
 
-   call ReadVariables(NumberOfNodes, NoOfReportSteps, CFL, InitialConditionChoice)
+   call ReadVariables(NumberOfNodes, NoOfReportSteps, CFL, InitialConditionChoice, MovingMeshChoice)
 
-   allocate (x(NumberOfNodes))
+   allocate (x(NumberOfNodes, 2), xdot(NumberOfNodes))
    allocate (Sol(0:NumberOfNodes, 3), Flux(NumberOfNodes, 3))
 
    Time = 0.0d0
    CurrentReportStep = 1
 
    ! Create mesh
-   call InitialMesh(x, NumberOfNodes, DeltaX)
+   call InitialMesh(x, xdot, NumberOfNodes, DeltaX)
 
    ! Set the initial condition
    call InitialCondition(x, Sol, NumberOfNodes, InitialConditionChoice, OutputTime &
@@ -34,6 +35,9 @@ program euler
    write (6, *) '         Time                Time-step                               '
    write (6, *) '---------------------------------------------------------------------'
 
+   open(unit=20,file='x_traj.m')
+   write(20,*) x(:,1), Time   
+
    do while (Time < OutputTime)
 
       ! Calculate the time-step
@@ -43,11 +47,11 @@ program euler
       ReportTime = dble(CurrentReportStep)*OutputTime/dble(NoOfReportSteps)
       DeltaT = min(Time + DeltaT, ReportTime) - Time
 
-      ! Increment the simulation time
-      Time = Time + DeltaT
-
-      ! Write out the current time and time-step size
-      write (6, '(2f20.8)') Time, DeltaT
+      ! Move the mesh
+      if (MovingMeshChoice .gt. 1) then
+         call LagrangianVelocity(Sol,x(:,1),xdot,NumberOfNodes)
+      endif
+      x(:,2) = x(:,1) + DeltaT * xdot
 
       ! Set the ghost cells
       call SetGhostCells(Sol, NumberOfNodes, BoundaryConditionLeft, BoundaryConditionRight)
@@ -58,12 +62,21 @@ program euler
       ! Update the solution
       call UpdateSolution(x, Sol, Flux, NumberOfNodes, DeltaT)
 
+      ! Increment the simulation time
+      Time = Time + DeltaT
+
+      ! Write out the current time and time-step size
+      write (6, '(2f20.8)') Time, DeltaT
+
       ! Write the current solution
       if (abs(Time - ReportTime) < 1d-10) then
          call WriteSolution(x, Sol, NumberOfNodes)
          CurrentReportStep = CurrentReportStep + 1
+         write(20,*) x(:,1), Time   
       endif
    enddo
+
+   close(10)
 
    call WriteVariables(OutputTime, NoOfReportSteps)
 
@@ -76,13 +89,14 @@ program euler
    write (6, *) '---------------------------------------------------------------------'
    write (6, *)
 
-end program euler
+end program Euler
 
-subroutine ReadVariables(NumberOfNodes, NoOfReportSteps, CFL, InitialConditionChoice)
+subroutine ReadVariables(NumberOfNodes, NoOfReportSteps, CFL, InitialConditionChoice, MovingMeshChoice)
    implicit none
 !-------------------------------------------------------------------------------
    double precision, intent(OUT) :: CFL
    integer, intent(OUT) :: NumberOfNodes, NoOfReportSteps, InitialConditionChoice
+   integer, intent(OUT) :: MovingMeshChoice
 !-------------------------------------------------------------------------------
 
    ! Read variables into program.
@@ -91,6 +105,7 @@ subroutine ReadVariables(NumberOfNodes, NoOfReportSteps, CFL, InitialConditionCh
    read (10, *) NoOfReportSteps
    read (10, *) CFL
    read (10, *) InitialConditionChoice
+   read (10, *) MovingMeshChoice
    close (10)
 
 end subroutine ReadVariables
@@ -113,11 +128,11 @@ subroutine WriteVariables(OutputTime, NoOfReportSteps)
 
 end subroutine WriteVariables
 
-subroutine InitialMesh(x, NumberOfNodes, DeltaX)
+subroutine InitialMesh(x, xdot, NumberOfNodes, DeltaX)
    implicit none
 !-------------------------------------------------------------------------------
    integer, intent(in) :: NumberOfNodes
-   double precision, intent(out) :: x(NumberOfNodes), DeltaX
+   double precision, intent(out) :: x(NumberOfNodes,2), xdot(NumberOfNodes), DeltaX
    double precision :: XMin, XMax
    integer :: i
 !-------------------------------------------------------------------------------
@@ -126,7 +141,9 @@ subroutine InitialMesh(x, NumberOfNodes, DeltaX)
    DeltaX = (XMax - XMin)/dble(NumberOfNodes - 1)
 
    do i = 1, NumberOfNodes
-      x(i) = XMin + dble(i - 1)*DeltaX
+      x(i,1) = XMin + dble(i - 1)*DeltaX
+      x(i,2) = x(i,1)
+      xdot(i) = 0.0
    enddo
 
    return
@@ -139,17 +156,17 @@ subroutine InitialCondition(x, Sol, NumberOfNodes, InitialConditionChoice, Outpu
    integer, intent(in) :: NumberOfNodes, InitialConditionChoice
    integer, intent(out) :: BoundaryConditionLeft, BoundaryConditionRight
    double precision, intent(out) :: OutputTime
-   double precision, intent(out) :: x(NumberOfNodes)
+   double precision, intent(out) :: x(NumberOfNodes,2)
    double precision, intent(out) :: Sol(0:NumberOfNodes, 3)
    integer :: i
 !-------------------------------------------------------------------------------
    do i = 1, NumberOfNodes
       if (InitialConditionChoice == 1) then
-         OutputTime = 0.2d0
+         OutputTime = 0.1d0
          BoundaryConditionLeft = 1
          BoundaryConditionRight = 1
          ! Sod Problem
-         if (x(i) < 0.5d0) then
+         if (x(i,1) < 0.5d0) then
             Sol(i, 1) = 1.0d0
             Sol(i, 2) = 0.0d0
             Sol(i, 3) = 2.5d0
@@ -163,11 +180,11 @@ subroutine InitialCondition(x, Sol, NumberOfNodes, InitialConditionChoice, Outpu
          OutputTime = 0.038d0
          BoundaryConditionLeft = 2
          BoundaryConditionRight = 2
-         if (x(i) <= 0.1d0) then
+         if (x(i,1) <= 0.1d0) then
             Sol(i, 1) = 1.0d0
             Sol(i, 2) = 0.0d0
             Sol(i, 3) = 1000.0d0/0.4d0
-         elseif (x(i) > 0.9) then
+         elseif (x(i,1) > 0.9) then
             Sol(i, 1) = 1.0d0
             Sol(i, 2) = 0.0d0
             Sol(i, 3) = 100.0d0/0.4d0
@@ -181,7 +198,7 @@ subroutine InitialCondition(x, Sol, NumberOfNodes, InitialConditionChoice, Outpu
          OutputTime = 0.14d0
          BoundaryConditionLeft = 1
          BoundaryConditionRight = 1
-         if (x(i) < 0.5d0) then
+         if (x(i,1) < 0.5d0) then
             Sol(i, 1) = 0.445d0
             Sol(i, 2) = 0.445d0*0.698d0
             Sol(i, 3) = 3.528d0/0.4d0 + 0.5d0*0.445d0*0.698d0*0.698d0
@@ -195,7 +212,7 @@ subroutine InitialCondition(x, Sol, NumberOfNodes, InitialConditionChoice, Outpu
          OutputTime = 0.2d0
          BoundaryConditionLeft = 1
          BoundaryConditionRight = 1
-         if (x(i) < 0.5d0) then
+         if (x(i,1) < 0.5d0) then
             Sol(i, 1) = 1.0d0
             Sol(i, 2) = 1.0d0*0.75d0
             Sol(i, 3) = 1.0d0/0.4d0 + 0.5d0*1.0d0*0.75d0*0.75d0
@@ -209,7 +226,7 @@ subroutine InitialCondition(x, Sol, NumberOfNodes, InitialConditionChoice, Outpu
          OutputTime = 0.15d0
          BoundaryConditionLeft = 1
          BoundaryConditionRight = 1
-         if (x(i) < 0.5d0) then
+         if (x(i,1) < 0.5d0) then
             Sol(i, 1) = 1.0d0
             Sol(i, 2) = -2.0d0
             Sol(i, 3) = 0.4d0/0.4d0 + 0.5d0*1.0d0*2d0*2d0
@@ -229,7 +246,7 @@ subroutine CalculateTimeStep(DeltaT, CFL, x, Sol, NumberOfNodes)
 !-------------------------------------------------------------------------------
    integer, intent(in) :: NumberOfNodes
    double precision, intent(out) :: DeltaT
-   double precision, intent(in) :: CFL, Sol(0:NumberOfNodes, 3), x(NumberOfNodes)
+   double precision, intent(in) :: CFL, Sol(0:NumberOfNodes, 3), x(NumberOfNodes,2)
    double precision :: v, Lambda(3), a, Pressure, State(3)
    double precision, external :: Eos
    integer :: i, j
@@ -245,7 +262,7 @@ subroutine CalculateTimeStep(DeltaT, CFL, x, Sol, NumberOfNodes)
       Lambda(2) = (Sol(i, 2)/Sol(i, 1))
       Lambda(3) = (Sol(i, 2)/Sol(i, 1)) + a
       do j = 1, 3
-         v = max(v, abs(Lambda(j))/(x(i + 1) - x(i)))
+         v = max(v, abs(Lambda(j))/(x(i + 1,1) - x(i,1)))
       enddo
    enddo
 
@@ -337,17 +354,22 @@ subroutine UpdateSolution(x, Sol, Flux, NumberOfNodes, DeltaT)
    implicit none
 !-------------------------------------------------------------------------------
    integer, intent(in) :: NumberOfNodes
-   double precision, intent(in) :: x(NumberOfNodes), Flux(NumberOfNodes, 3)
+   double precision, intent(inout) :: x(NumberOfNodes,2)
+   double precision, intent(in) :: Flux(NumberOfNodes, 3)
    double precision, intent(in) :: DeltaT
    double precision, intent(inout) :: Sol(0:NumberOfNodes, 3)
-   double precision :: DeltaX
+   double precision :: NewDeltaX, OldDeltaX
    integer :: i
 !-------------------------------------------------------------------------------
 
    do i = 1, NumberOfNodes - 1
-      DeltaX = x(i + 1) - x(i)
-      Sol(i, :) = Sol(i, :) - (DeltaT/DeltaX)*(Flux(i + 1, :) - Flux(i, :))
+      OldDeltaX = x(i + 1,1) - x(i,1)
+      NewDeltaX = x(i + 1,2) - x(i,2)
+      Sol(i, :) = (OldDeltaX/NewDeltaX)*Sol(i, :) - (DeltaT/NewDeltaX)*(Flux(i + 1, :) - Flux(i, :))
    enddo
+
+   x(:,1) = x(:,2)
+   x(:,2) = 0.0d0;
 
    return
 end subroutine UpdateSolution
@@ -356,7 +378,7 @@ subroutine WriteSolution(x, Sol, NumberOfNodes)
    implicit none
 !-------------------------------------------------------------------------------
    integer, intent(in) :: NumberOfNodes
-   double precision, intent(in) :: x(NumberOfNodes), Sol(0:NumberOfNodes, 3)
+   double precision, intent(in) :: x(NumberOfNodes,2), Sol(0:NumberOfNodes, 3)
 !-------------------------------------------------------------------------------
    ! Variables for writing output files
    character(LEN=40) :: Filename
@@ -378,7 +400,7 @@ subroutine WriteSolution(x, Sol, NumberOfNodes)
    Filename = trim(Filename)//'.m'
    open (unit=10, file=Filename)
    do i = 1, NumberOfNodes - 1
-      write (10, '(99f20.8)') 0.5d0*(x(i + 1) + x(i)), Sol(i, 1), Sol(i, 2)/Sol(i, 1), Eos(Sol(i,:)), Sol(i,3)/Sol(i,1) 
+      write (10, '(99f20.8)') 0.5d0*(x(i + 1,1) + x(i,1)), Sol(i, 1), Sol(i, 2)/Sol(i, 1), Eos(Sol(i,:)), Sol(i,3)/Sol(i,1) 
    enddo
    close (unit=10)
 
@@ -481,3 +503,83 @@ subroutine EigenSystem(Values, Vectors, State)
 
    return
 end subroutine EigenSystem
+
+subroutine LagrangianVelocity(u,x,xdot,NumberOfNodes)
+   use linear_solvers
+
+   implicit none
+!---------------------------------------------------------------------------------      
+!        GLOBAL VARIABLES
+   integer, intent(IN) :: NumberOfNodes
+   double precision, intent(INOUT), dimension(0:NumberOfNodes, 3) :: u
+   double precision, intent(IN), dimension(NumberOfNodes) :: x
+   double precision, intent(INOUT), dimension(NumberOfNodes) :: xdot
+!---------------------------------------------------------------------------------      
+!        LOCAL VARIABLES
+   double precision, dimension(NumberOfNodes,NumberOfNodes) :: K
+   double precision, dimension(NumberOfNodes) :: rhs, psi
+   integer :: j    
+!---------------------------------------------------------------------------------
+   K=0.0d0; xdot=0.0d0; psi=0.0d0
+
+   K(1,1) = -0.5d0*((u(2,1)+u(1,1))/(x(2)-x(1))) -0.5d0*((u(1,1)+u(2,1))/(x(1)+x(2)))
+   K(2,1) =  0.5d0*((u(2,1)+u(1,1))/(x(2)-x(1)))
+   rhs(1) = 0.5d0*( u(2,2) + u(1,2) )
+   
+   do j=2, NumberOfNodes-1
+      K(j-1,j) = 0.5d0*((u(j,1)+u(j-1,1))/(x(j)-x(j-1)))
+      K(j,j) = -0.5d0*((u(j,1)+u(j-1,1))/(x(j)-x(j-1))) - 0.5d0*((u(j+1,1)+u(j,1))/(x(j+1)-x(j)))
+      K(j+1,j) = 0.5d0*((u(j+1,1)+u(j,1))/(x(j+1)-x(j)))
+      rhs(j) = 0.5d0*( u(j+1,2) - u(j-1,2) )
+   end do
+        
+   K(NumberOfNodes-1,NumberOfNodes) = 0.5d0*((u(NumberOfNodes,1)+u(NumberOfNodes-1,1))/(x(NumberOfNodes)-x(NumberOfNodes-1)))
+   K(NumberOfNodes,NumberOfNodes) = -0.5d0*((u(NumberOfNodes,1)+u(NumberOfNodes-1,1))/(x(NumberOfNodes)-x(NumberOfNodes-1)))
+   rhs(NumberOfNodes) = -0.5d0*( u(NumberOfNodes,2) + u(NumberOfNodes-1,2) )
+                   
+   call gaussian_elimination(K,psi,rhs,NumberOfNodes)
+
+   call VelocityRecovery(x,xdot,psi,NumberOfNodes)        
+
+   return
+
+end subroutine LagrangianVelocity
+
+subroutine VelocityRecovery(x,xdot,psi,NumberOfNodes)
+   use linear_solvers
+
+   implicit none
+!---------------------------------------------------------------------------------
+!        GLOBAL VARIABLES
+   integer, intent(IN) :: NumberOfNodes
+   double precision, intent(INOUT), dimension(NumberOfNodes) :: xdot
+   double precision, intent(IN), dimension(NumberOfNodes) :: x
+   double precision, intent(IN), dimension(NumberOfNodes) :: psi
+!---------------------------------------------------------------------------------
+!        LOCAL VARIABLES
+   double precision, dimension(NumberOfNodes,NumberOfNodes) :: Mass
+   double precision, dimension(NumberOfNodes) :: f
+   integer :: j
+!--------------------------------------------------------------------------------
+   Mass=0.0d0; f=0.0d0; xdot=0.0d0
+                
+   Mass(1,1) = (1.0d0/3.0d0)*(x(2)-x(1))
+   Mass(2,1) = (1.0d0/6.0d0)*(x(2)-x(1))
+   f(1) = 0.5d0*(psi(2)-psi(1))
+   
+   do j=2, NumberOfNodes-1
+      Mass(j-1,j) = (1.0d0/6.0d0)*(x(j)-x(j-1))
+      Mass(j,j) = (1.0d0/3.0d0)*(x(j+1)-x(j-1))
+      Mass(j+1,j) = (1.0d0/6.0d0)*(x(j+1)-x(j))
+      f(j) = 0.5d0*(psi(j+1)-psi(j-1))
+   end do
+        
+   Mass(NumberOfNodes-1,NumberOfNodes) = (1.0d0/6.0d0)*(x(NumberOfNodes)-x(NumberOfNodes-1))
+   Mass(NumberOfNodes,NumberOfNodes) = (1.0d0/3.0d0)*(x(NumberOfNodes)-x(NumberOfNodes-1))
+   f(NumberOfNodes) = 0.5d0*(psi(NumberOfNodes)-psi(NumberOfNodes-1))
+        
+   call gaussian_elimination(Mass,xdot,f,NumberOfNodes)
+        
+   return
+
+end subroutine VelocityRecovery
