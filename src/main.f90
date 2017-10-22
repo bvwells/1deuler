@@ -362,7 +362,7 @@ subroutine WriteSolution(x, Sol, NumberOfNodes)
    character(LEN=40) :: Filename
    character(LEN=10) :: numbers = '0123456789'
    integer, parameter :: NoOfSF = 3
-   integer :: TestNumber, i, j, units(NoOfSF)
+   integer :: TestNumber, i, units(NoOfSF)
    integer, save :: ReportStep = 1
    double precision, external :: Eos
 !-------------------------------------------------------------------------------
